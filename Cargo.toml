@@ -1,0 +1,12 @@
+[package]
+name = "llama2-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.38"
+rayon = "1.10.0"
+sentencepiece = "0.11.2"
+
+[profile.dev]
+opt-level = 3

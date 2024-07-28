@@ -1,0 +1,7 @@
+# Project files
+/target
+/models/stories110M.bin
+/models/stories260K.bin
+
+# IDE
+.idea
