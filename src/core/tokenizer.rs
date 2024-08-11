@@ -83,7 +83,7 @@ impl Tokenizer {
         if let Some(byte_val) = Self::parse_byte_token(piece) {
             let start = byte_val as usize;
             piece = std::str::from_utf8(&self.byte_pieces[start..start + 1])
-                .expect("Invalid UTF-8 sequence in byte_pieces");
+                .unwrap_or_else(|_| panic!("Invalid UTF-8 sequence in byte_pieces: {}: {}", piece, byte_val));
         }
 
         piece
@@ -91,7 +91,13 @@ impl Tokenizer {
 
     fn parse_byte_token(token: &str) -> Option<u8> {
         if token.len() == 6 && token.starts_with("<0x") && token.ends_with('>') {
-            u8::from_str_radix(&token[3..5], 16).ok()
+            let byte = u8::from_str_radix(&token[3..5], 16).unwrap();
+            if byte <= 127 {
+                Some(byte)
+            } else {
+                println!("{}", byte);
+                None
+            }
         } else {
             None
         }

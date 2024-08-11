@@ -170,7 +170,7 @@ impl Transformer {
         let s = &mut self.state;
         let dim = p.dim as usize;
         let kv_dim = (p.dim * p.n_kv_heads) / p.n_heads;
-        let kv_mul = (p.n_heads / p.n_kv_heads) as usize;
+        let kv_mul = (p.n_heads / p.n_kv_heads) as usize;  // integer multiplier of the kv sharing in multiquery
         let hidden_dim = p.hidden_dim;
         let head_size = dim / p.n_heads as usize;
 
@@ -180,7 +180,7 @@ impl Transformer {
         );
 
         // Forward all the layers
-        for l in 0..p.n_layers as usize{
+        for l in 0..p.n_layers as usize {
             // Attention rms normalization
             // X_b = rmsnorm(X, W_att_rms)
             rmsnorm(&mut s.xb, &s.x, &w.rms_att_weight[
@@ -190,7 +190,7 @@ impl Transformer {
             // Key and value point to the kv cache
             // kv cache layer offset for convenience
             let loff = l * (p.seq_len * kv_dim) as usize;
-            let k_start = loff + (pos * kv_dim as usize);
+            let k_start = loff + pos * kv_dim as usize;
             let v_start = k_start;
 
             // qkv matmuls for this position
@@ -216,12 +216,12 @@ impl Transformer {
                 let head_dim = i % head_size;
                 let freq = 1.0 / 10000f32.powf(head_dim as f32 / head_size as f32);
                 let val = pos as f32 * freq;
-                let (fcr, fci) = val.sin_cos();
+                let (fci, fcr) = val.sin_cos();
                 let rotn = if i < kv_dim as usize { 2 } else { 1 };  // 2 = q & k, 1 = q only
                 for v in 0..rotn {
                     // the vector to rotate (query or key)
                     let vec = if v == 0 { &mut s.q } else {
-                        &mut s.key_cache[k_start..k_start + kv_dim as usize] 
+                        &mut s.key_cache[k_start..k_start + kv_dim as usize]
                     };
                     let v0 = vec[i];
                     let v1 = vec[i + 1];
@@ -299,7 +299,8 @@ impl Transformer {
             // H_b = SwiGLU(H_b, H_b2)
             for i in 0..hidden_dim as usize {
                 let val = s.hb[i];
-                s.hb[i] = val / (1.0 + (-val).exp()) * s.hb2[i];
+                // silu(x)=x*σ(x), where σ(x) is the logistic sigmoid
+                s.hb[i] = (val / (1.0 + (-val).exp())) * s.hb2[i];
             }
 
             // Final matmul to get the output of the ffn
